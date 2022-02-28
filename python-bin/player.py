@@ -74,7 +74,6 @@ def _suggest_letters(words, omit=None, include={}):
         letter_dist.pop(letter)
     # get letters
     letter_dist_sorted = sorted(letter_dist, key=letter_dist.get, reverse=True)
-    print(letter_dist_sorted)
     iter_size = 5-len(letters)
     for it in product(letter_dist_sorted, repeat=iter_size):
         # check that we have 5 unique letters
@@ -101,6 +100,7 @@ def _get_suggested_word(suggestable_words, include):
         suggested_word = suggestable_words[0]
         return suggested_word
     # find word with proper include positions and improper include positions
+    all_sugg = []
     for suggestable_word in suggestable_words:
         valid_word = True
         for letter,positions in include.items():
@@ -121,8 +121,12 @@ def _get_suggested_word(suggestable_words, include):
                         valid_word = False
                         break
         if valid_word:
-            return suggestable_word
-    return suggested_word
+            all_sugg.append(suggestable_word)
+    if len(all_sugg) > 0:
+        print(all_sugg)
+        return all_sugg[0]
+    else:
+        return suggested_word
 
 # function to suggest a word according to the board state and the 5 most common letters in the word list.
 def suggest_word(words, board_state):
