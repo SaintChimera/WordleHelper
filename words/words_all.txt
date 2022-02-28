@@ -8094,7 +8094,6 @@ ismal
 isnad
 isnae
 isoln
-isort
 issei
 issue
 isthm
@@ -9191,7 +9190,6 @@ lathe
 lathi
 laths
 lathy
-latin
 latke
 laton
 latro
@@ -12603,7 +12601,6 @@ prahm
 prahu
 prams
 prana
-prand
 prang
 prank
 praos
@@ -16157,7 +16154,6 @@ tatus
 taube
 taula
 tauld
-tauli
 taunt
 tauon
 taupe

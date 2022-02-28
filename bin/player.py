@@ -1,4 +1,6 @@
 import os, sys
+from itertools import product
+from collections import OrderedDict
 
 # function to build an omit list with the board state.
 def _build_omit_list(board_state):
@@ -25,21 +27,26 @@ def _build_include_dict(board_state):
     if len(board_state) != 0:
         for word,hot_l in board_state.items():
             for i in range(len(hot_l)):
+                letter = word[i]
                 hot = hot_l[i]
                 if hot == '0':
                     continue
                 elif hot == '1':
                     position = (i+1) * -1
-                    if word[i] in include:
-                        include[word[i]] = include[word[i]].append(position)
+                    if letter in include:
+                        letter_list = include[letter]
+                        letter_list.append(position)
+                        include[letter] = letter_list
                     else:
-                        include[word[i]] = [position]
+                        include[letter] = [position]
                 elif hot == '2':
                     position = i+1
-                    if word[i] in include:
-                        include[word[i]] = include[word[i]].append(position)
+                    if letter in include:
+                        letter_list = include[letter]
+                        letter_list.append(position)
+                        include[letter] = letter_list
                     else:
-                        include[word[i]] = [position]
+                        include[letter] = [position]
                 else:
                     print(f"invalid hot encoding {hot} for {word}")
                     exit()
@@ -56,24 +63,29 @@ def _suggest_letters(words, omit=None, include={}):
             else:
                 letter_dist[letter] = 1
     
-    # return the top 5 letters
-#    letters = sorted(letter_dist.items(), key=lambda x:x[1])
-    letters = list(include.keys())
-    for i in range(len(letters),5):
-        largest_key = ''
-        largest_value = 0
-        for key,value in letter_dist.items():
-            if omit != None and key in omit:
-                continue
-            if key in include:
-                continue
-            if value > largest_value:
-                largest_key = key
-                largest_value = value
-        letters.append(largest_key)
-        letter_dist.pop(largest_key)
-    letters = ''.join(a for a in letters)
-    return letters
+    # return the top 5 letters at a time
+    letters = include.keys() # has to include these letters
+    letters_string = ''.join(a for a in letters)
+    # remove include letters from letters_dict since we're going to be building new sets from letters_dict
+    for letter in letters:
+        letter_dist.pop(letter)
+    # remove omit letters from letters_dist
+    for letter in omit:
+        letter_dist.pop(letter)
+    # get letters
+    letter_dist_sorted = sorted(letter_dist, key=letter_dist.get, reverse=True)
+    print(letter_dist_sorted)
+    iter_size = 5-len(letters)
+    for it in product(letter_dist_sorted, repeat=iter_size):
+        # check that we have 5 unique letters
+        dedup_set = set()
+        for a in it:
+            dedup_set.add(a)
+        if len(dedup_set) < iter_size: # try again if we do
+            continue
+        else: #return if we dont
+            yield_str = letters_string + ''.join(a for a in it)
+            yield yield_str
 
 # finds all possible words according to the letters list, not considering the include list
 def _find_words(words, letters):
@@ -91,8 +103,6 @@ def _get_suggested_word(suggestable_words, include):
     # find word with proper include positions and improper include positions
     for suggestable_word in suggestable_words:
         valid_word = True
-        if suggestable_word == 'speil':
-            print("jere")
         for letter,positions in include.items():
             # first check if an include letter is in our suggestable_word. because it has to be
             suggestable_word_letter_loc = suggestable_word.find(letter)
@@ -102,12 +112,12 @@ def _get_suggested_word(suggestable_words, include):
             # if the letter is a proper location letter and the letter was not found in that proper location.
             for position in positions:
                 if position > 0:
-                    if position != suggestable_word_letter_loc:
+                    if position-1 != suggestable_word_letter_loc:
                         valid_word = False
                         break
                 # if the letter is an improper location letter and the letter was found in the same location.
                 if position < 0:
-                    if (position*-1) == suggestable_word_letter_loc:
+                    if (position*-1)-1 == suggestable_word_letter_loc:
                         valid_word = False
                         break
         if valid_word:
@@ -115,24 +125,19 @@ def _get_suggested_word(suggestable_words, include):
     return suggested_word
 
 # function to suggest a word according to the board state and the 5 most common letters in the word list.
-#def suggest_word(words, letters, include={}):
 def suggest_word(words, board_state):
     # build omit list and include dict from board state
     omit = _build_omit_list(board_state)
     include = _build_include_dict(board_state)
-    # get a word
-    suggested_word = ''
-    while suggested_word == '':
-        letters = _suggest_letters(words, omit, include)
+
+    for letters in _suggest_letters(words, omit, include):
         suggestable_words = _find_words(words, letters)
         suggested_word = _get_suggested_word(suggestable_words, include)
-        # this forces a letter change and therefore a suggested_word change.
-        # get all letters in omit that aren't in include. then add the first to omit.
-        if suggested_word == '':
-            removeable_letters = [a for a in letters if a not in include]
-            omit.append(removeable_letters[0])
+        # check if we actually got a word.
+        if suggested_word != '':
+            return suggested_word
         
-    return suggested_word
+    return ''
 
 
 ### main ###
@@ -149,7 +154,7 @@ word = suggest_word(words, board_state)
 print(f"play '{word}'")
 
 line = ''
-while line != '22222':
+while line != ['2','2','2','2','2']:
     line = input("What is the board state? Type it like '00120'.")
     # update board state
     line = list(line.strip('\n'))
