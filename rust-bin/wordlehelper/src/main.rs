@@ -1,18 +1,38 @@
-// rust implementation of wordle helper. python implementation is in python-bin.
+/*
+* rust implementation of wordle helper.
+* works by taking the frequency distribution of characters and their positions in a 5 letter word
+* then trying to pick words where each character is the best possible character for that location
+* if a picked word doesn't exist, it then changes a single letter and tries again.
+* the letter that it changed is the letter that has another letter closest to the optimal letter
+*
+* ex. the best word is 'sares'. this is not a word.
+*     the distance to the next letter for all of those letters are {s:500, a:300, r:50, e:600, s:900}.
+*     the 'r' is the closest to the next letter. lets say this next letter is 't'. so that letter is changed.
+*
+*     the next word is 'sates'. this is not a word.
+*     the distance to the next letter for all of those letters are {s:500, a:300, t:150, e:600, s:900}.
+*     the catch is that the distance for 't' is not the distance between 't' and the next letter(lets say its 'i').
+*     the distance for 't' is the distance between 'i' and 'r'. lets say 't' and 'r' is 50, and 'i' and 't' is 100.
+*     the distances of 50 and 100 would be added for the new distance.
+*
+*     the next word is 'saies'. this is not a word.
+*     the distance to the next letter for all of those letters are {s:500, a:300, i:350, e:600, s:900}.
+*     'a' now has the smallest distance. 'a' is changed to the next letter and 'i' is changed back to the best option 'r'.
+*
+*     there is an infinite loop in this logic technically.
+*     right after switching 'a', the 3rd position 'r' will have the lowest distance and will be switched in the next loop.
+*     pushing the new 2nd letter back to the optimal 'a' and thus starting this example over.
+*     the solution is 
+*
+*     this happens until a word is found. that word becomes the suggested guess.
+*     once the board state is updated with the results of that guess, we can start the algorithm over with a set of known correct locations, known incorrect letters, and known letters with incorrect locations.
+*/
 
 use std::env;
 use std::fs;
 use std::collections::HashMap;
 
-// TODO: build omit vec
 
-// TODO: build include hashmap
-
-// TODO: suggest letters
-
-// TODO: find words with letters
-
-// TODO: get suggested word
 
 // TODO: suggest word
 fn suggest_word(words: &Vec<&str>, board_state: &HashMap<&str,Vec<u8>>) -> String {
