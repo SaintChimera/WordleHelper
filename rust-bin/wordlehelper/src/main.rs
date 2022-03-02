@@ -69,9 +69,10 @@
 use std::env;
 use std::fs;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 
-fn get_letter_frequencies(words: &Vec<&str>) -> HashMap<char,Vec<usize>>{
+fn get_letter_frequencies(words: &HashSet<&str>) -> HashMap<char,Vec<usize>>{
     let mut letter_dist: HashMap<char,Vec<usize>> = HashMap::new();
     for word in words.into_iter(){
         let letters: Vec<char> = word.chars().collect();
@@ -85,10 +86,8 @@ fn get_letter_frequencies(words: &Vec<&str>) -> HashMap<char,Vec<usize>>{
     return letter_dist;
 }
 
-// TODO: build sorted frequency distance lists for each position in the word
 // returns a vector where each position is a distance list for that position in the string
 fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(char,usize)>>{
-//fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) {
     // iterate over hashmap pulling out the vec's values into separate hashmaps. push those to a vec to be our distance lists.
     let mut distance_lists: Vec<Vec<(char,usize)>> = Vec::new();
     for i in 0..5{
@@ -108,9 +107,11 @@ fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(char,us
         for i in 0..sorted_row.len() {
             let mut distance = 0;
             let (letter,freq) = sorted_row[i];
-            distance = optimal_freq - freq;
-            if i == (sorted_row.len()-1){
+            if i == (sorted_row.len()-1){ // if this is the last
                 distance = 100000; // something really high that wont be rotated.
+            } else { 
+                let (next_letter,next_freq) = sorted_row[i+1]; // grab the next letters frequence, store it under this letter.
+                distance = optimal_freq - next_freq;
             }
             distance_list.push((letter,distance));
         }
@@ -121,10 +122,64 @@ fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(char,us
     return distance_lists;
 }
 
-// TODO: used distance lists to find a word.
+//  use distance lists to find a word.
+fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>) -> String{
+    // letter_movement keeps track of which letter positions are moving the most and ensures they keep moving
+    let letter_movement = [0,0,0,0,0];
+    // letter_grab keeps track of which positions to look at and grab from in the distance lists.
+    let letter_grab = [0,0,0,0,0];
+
+    // unpack distance lists
+    let first_distance_list = &distance_lists[0];
+    let second_distance_list = &distance_lists[1];
+    let third_distance_list = &distance_lists[2];
+    let fourth_distance_list = &distance_lists[3];
+    let fifth_distance_list = &distance_lists[4];
+
+    // loop
+    // TODO: when should i actually quit?
+//    loop {
+        // generate a word from the top of the distance list
+        let guess_word_vec = vec![
+                            first_distance_list[letter_grab[0]].0,
+                            second_distance_list[letter_grab[1]].0,
+                            third_distance_list[letter_grab[2]].0,
+                            fourth_distance_list[letter_grab[3]].0,
+                            fifth_distance_list[letter_grab[4]].0
+                            ];
+        let guess_word: String = guess_word_vec.into_iter().collect();
+        println!("{}",guess_word);
+    
+        // check if that word is in words. return it if it is.
+        if words.contains(&guess_word.as_str()){
+            return guess_word.to_string();
+        } else {
+            // otherwise find the letter with the lowest distance and shift it. update letter_movement.
+            // build a vector of the current distances
+            let minvec = vec![
+                                first_distance_list[letter_grab[0]].1,
+                                second_distance_list[letter_grab[1]].1,
+                                third_distance_list[letter_grab[2]].1,
+                                fourth_distance_list[letter_grab[3]].1,
+                                fifth_distance_list[letter_grab[4]].1
+                                ];
+ //          let minimum_distance = minvec.iter().min();
+            let minimum_distance = match minvec.iter().min() {
+                Some(a) => a,
+                None => panic!("No minimum distance found in suggest_word")
+            };
+            let movement_position = match minvec.iter().position(|&x| x == *minimum_distance){
+                Some(a) => a,
+                None => panic!("No movement position found in suggest_word")
+            };
+            println!("{:?} : {:?}", minvec, movement_position);
+        }
+//    }
+
+    return "nasty".to_string();
+}
 
 // get the word list, suggest word to player, get board state update from player.
-// handles errors
 fn main() {
     // get words in file
     let args: Vec<String> = env::args().collect();
@@ -134,8 +189,8 @@ fn main() {
         Ok(words_s) => words_s,
         Err(error) => panic!("Could not open word file: {:?}", error)
     };
-    // split to vec of str's
-    let words: Vec<&str> = words_s.split("\n").collect();
+    // split to hashset of str's
+    let words: HashSet<&str> = words_s.split("\n").collect();
 
     // board state tracks all guesses and the results of those guesses.
     // value is a hot encoding where 0 is a miss, 1 is an incorrect position, 2's are correct positions.
@@ -145,6 +200,9 @@ fn main() {
     let letter_dist = get_letter_frequencies(&words);
 
     // get distance lists for each row
-    let distance_list = get_distance_list(&letter_dist);
+    let distance_lists = get_distance_list(&letter_dist);
 
+    // get a word
+    let guess_word = suggest_word(&words,&distance_lists);
+    println!("{}", guess_word);
 }
