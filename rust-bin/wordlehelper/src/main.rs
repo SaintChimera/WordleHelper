@@ -19,13 +19,50 @@
 *     the distance to the next letter for all of those letters are {s:500, a:300, i:350, e:600, s:900}.
 *     'a' now has the smallest distance. 'a' is changed to the next letter and 'i' is changed back to the best option 'r'.
 *
+*     this happens until a word is found. that word becomes the suggested guess.
+*     once the board state is updated with the results of that guess, we can start the algorithm over with a set of known correct locations, known incorrect letters, and known letters with incorrect locations.
+*
 *     there is an infinite loop in this logic technically.
 *     right after switching 'a', the 3rd position 'r' will have the lowest distance and will be switched in the next loop.
 *     pushing the new 2nd letter back to the optimal 'a' and thus starting this example over.
-*     the solution is 
+*     the solution is to maintain a vec denoting how many times a position has been changed. this is the sync table.
+*     then using that to decide whether a position is changed back
+*     a position is only changed back if its sync table value is larger than that of the value being changed.
 *
-*     this happens until a word is found. that word becomes the suggested guess.
-*     once the board state is updated with the results of that guess, we can start the algorithm over with a set of known correct locations, known incorrect letters, and known letters with incorrect locations.
+{s:800, a:300, r:50, e:900, s:1000}   [0,0,0,0,0]
+{s:800, a:300, t:250, e:900, s:1000}  [0,0,1,0,0]
+{s:800, a:300, l:350, e:900, s:1000}  [0,0,2,0,0]
+{s:800, b:400, r:50, e:900, s:1000}   [0,1,2,0,0]
+{s:800, b:400, t:250, e:900, s:1000}  [0,1,3,0,0]
+{s:800, b:400, l:350, e:900, s:1000}  [0,1,4,0,0]
+{s:800, b:400, g:450, e:900, s:1000}  [0,1,5,0,0]
+{s:800, c:500, r:50, e:900, s:1000}   [0,2,5,0,0]
+{s:800, c:500, t:250, e:900, s:1000}   [0,2,6,0,0]
+{s:800, c:500, l:350, e:900, s:1000}   [0,2,7,0,0]
+{s:800, c:500, g:450, e:900, s:1000}   [0,2,8,0,0]
+{s:800, c:500, p:550, e:900, s:1000}   [0,2,9,0,0]
+{s:800, d:600, r:50, e:900, s:1000}   [0,3,9,0,0]
+{s:800, d:600, t:250, e:900, s:1000}   [0,3,10,0,0]
+{s:800, d:600, l:350, e:900, s:1000}   [0,3,11,0,0]
+{s:800, d:600, g:450, e:900, s:1000}   [0,3,12,0,0]
+{s:800, d:600, p:550, e:900, s:1000}   [0,3,13,0,0]
+{s:800, d:600, u:1200, e:900, s:1000}   [0,3,14,0,0]
+{s:800, e:650, r:50, e:900, s:1000}   [0,4,14,0,0]
+{s:800, e:650, t:250, e:900, s:1000}   [0,4,15,0,0]
+{s:800, e:650, l:350, e:900, s:1000}   [0,4,16,0,0]
+{s:800, e:650, g:450, e:900, s:1000}   [0,4,17,0,0]
+{s:800, e:650, p:550, e:900, s:1000}   [0,4,18,0,0]
+{s:800, e:650, u:1200, e:900, s:1000}   [0,4,19,0,0]
+{s:800, f:700, r:50, e:900, s:1000}   [0,5,19,0,0]
+{s:800, f:700, t:250, e:900, s:1000}   [0,5,20,0,0]
+{s:800, f:700, l:350, e:900, s:1000}   [0,5,21,0,0]
+{s:800, f:700, g:450, e:900, s:1000}   [0,5,22,0,0]
+{s:800, f:700, p:550, e:900, s:1000}   [0,5,23,0,0]
+{s:800, f:700, u:1200, e:900, s:1000}   [0,5,24,0,0]
+{s:800, g:750, r:50, e:900, s:1000}   [0,6,24,0,0]
+*
+*    an expansion on all of the above is to use previous answers as the input to the letter frequencies instead of the whole wordle list.
+*    the whole wordle list has some crazy words in it. the answer list should only have reasonable words.
 */
 
 use std::env;
@@ -33,16 +70,23 @@ use std::fs;
 use std::collections::HashMap;
 
 
+fn get_letter_frequencies(words: &Vec<&str>) -> HashMap<char,Vec<usize>>{
+    let mut letter_dist: HashMap<char,Vec<usize>> = HashMap::new();
+    for word in words.into_iter(){
+        let letters: Vec<char> = word.chars().collect();
+        for i in 0..letters.len(){
+            let letter = letters[i];
+            let letter_l = letter_dist.entry(letter).or_insert(vec![0,0,0,0,0]);
+            letter_l[i] = letter_l[i] + 1
+        }
+    }
 
-// TODO: suggest word
-fn suggest_word(words: &Vec<&str>, board_state: &HashMap<&str,Vec<u8>>) -> String {
-    // build omit and include lists
-    //let omit: Vec<&str> = build_omit_list(board_state)
-    //let include: HashMap<char, Vec<i8>> = build_include_list(board_state)
-
-    let word: String = words[0].to_string();
-    return word;
+    return letter_dist;
 }
+
+// TODO: build sorted frequency distance lists for each position in the word
+
+// TODO: used distance lists to find a word.
 
 // get the word list, suggest word to player, get board state update from player.
 // handles errors
@@ -62,7 +106,10 @@ fn main() {
     // value is a hot encoding where 0 is a miss, 1 is an incorrect position, 2's are correct positions.
     let mut board_state: HashMap<&str,Vec<u8>> = HashMap::new();
 
-    // get our first word
-    let word = suggest_word(&words, &board_state);
-    println!("{:?}",word);
+    // get letter frequencies
+    let letter_dist = get_letter_frequencies(&words);
+    for (key,value) in letter_dist.iter(){
+        println!("{}{:?}",key,value);
+    }
+
 }
