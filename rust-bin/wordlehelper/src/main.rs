@@ -63,6 +63,7 @@
 *
 *    an expansion on all of the above is to use previous answers as the input to the letter frequencies instead of the whole wordle list.
 *    the whole wordle list has some crazy words in it. the answer list should only have reasonable words.
+*    a filtered list of all wordle lists may be a good idea as well.
 */
 
 use std::env;
@@ -85,6 +86,40 @@ fn get_letter_frequencies(words: &Vec<&str>) -> HashMap<char,Vec<usize>>{
 }
 
 // TODO: build sorted frequency distance lists for each position in the word
+// returns a vector where each position is a distance list for that position in the string
+fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(char,usize)>>{
+//fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) {
+    // iterate over hashmap pulling out the vec's values into separate hashmaps. push those to a vec to be our distance lists.
+    let mut distance_lists: Vec<Vec<(char,usize)>> = Vec::new();
+    for i in 0..5{
+        let mut ret_row: HashMap<char,usize> = HashMap::new();
+        for (letter,list) in letter_dist.iter(){
+            ret_row.insert(*letter,list[i]);
+        }
+
+        let mut sorted_row: Vec<(char,usize)> = ret_row.into_iter().collect();
+        sorted_row.sort_by_key(|a| a.1);
+        sorted_row.reverse();
+
+        // iterate over frequency row and build a distance list
+        let mut distance_list: Vec<(char,usize)> = Vec::new();
+        // all distance are with reference to the optimal
+        let (optimal_letter,optimal_freq) = sorted_row[0];
+        for i in 0..sorted_row.len() {
+            let mut distance = 0;
+            let (letter,freq) = sorted_row[i];
+            distance = optimal_freq - freq;
+            if i == (sorted_row.len()-1){
+                distance = 100000; // something really high that wont be rotated.
+            }
+            distance_list.push((letter,distance));
+        }
+        distance_lists.push(distance_list);
+    }
+
+    // return looks like distance_lists<distance_list<letter,distance>>
+    return distance_lists;
+}
 
 // TODO: used distance lists to find a word.
 
@@ -108,8 +143,8 @@ fn main() {
 
     // get letter frequencies
     let letter_dist = get_letter_frequencies(&words);
-    for (key,value) in letter_dist.iter(){
-        println!("{}{:?}",key,value);
-    }
+
+    // get distance lists for each row
+    let distance_list = get_distance_list(&letter_dist);
 
 }
