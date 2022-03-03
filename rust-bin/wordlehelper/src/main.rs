@@ -68,23 +68,84 @@
 
 use std::env;
 use std::fs;
+use std::io;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
 
-fn get_letter_frequencies(words: &HashSet<&str>) -> HashMap<char,Vec<usize>>{
+// get the frequencies of each letter in their positions
+// use the omit list and include list to force letters in or out of their positions
+fn get_letter_frequencies(words: &HashSet<&str>, board_state: &HashMap<String,Vec<u8>>) -> HashMap<char,Vec<usize>>{
+    // omit list, used to indicate letters that are definitely not in the set and in the wrong position
+    let (omit_letters,omit_positions) = build_omit_list(board_state);
+    // include list, used to indicate letters that are definitely in the right position.
+    // TODO: as of right now, we ignore when a character is in the string but not in the correct position.
+    //       right now it just gets added to the guess position in the omit list, so that it doesn't end up in that position again.
+//    let include = build_include_list(board_state);
+
     let mut letter_dist: HashMap<char,Vec<usize>> = HashMap::new();
-    for word in words.into_iter(){
+    for word in words.into_iter(){ 
         let letters: Vec<char> = word.chars().collect();
         for i in 0..letters.len(){
             let letter = letters[i];
-            let letter_l = letter_dist.entry(letter).or_insert(vec![0,0,0,0,0]);
-            letter_l[i] = letter_l[i] + 1
+            if omit_letters.contains(&letter) {
+                let omit_letter_loc = match omit_letters.iter().position(|&x| x == letter){
+                    Some(a) => a,
+                    None => panic!("No movement position found in suggest_word")
+                };
+                if omit_positions[omit_letter_loc] > 5 { // skip insertion since this letter has been deemed not in the answer word
+                    continue;
+                }
+                else if omit_positions[omit_letter_loc] < 5 && omit_positions[omit_letter_loc] == i { // skip insertion since this letter is not in this position in the answer word
+                    continue;
+                }
+                else { // add the letter since the omit list doesn't omit it from this position
+                    let letter_l = letter_dist.entry(letter).or_insert(vec![0,0,0,0,0]); // either insert an empty vec or
+                    letter_l[i] = letter_l[i] + 1 // increment the position in the existing vec for that letter
+                }
+            }
+            else { // add the letter since its not in the omit list
+                let letter_l = letter_dist.entry(letter).or_insert(vec![0,0,0,0,0]); // either insert an empty vec or
+                letter_l[i] = letter_l[i] + 1 // increment the position in the existing vec for that letter
+            }
         }
     }
 
     return letter_dist;
 }
+
+// omit list. a letter and position tuple, where the position is where to omit the letter from.
+// a position >5 indicates an omit from every position
+fn build_omit_list(board_state: &HashMap<String,Vec<u8>>) -> (Vec<char>,Vec<usize>) {
+//    let mut omit: Vec<(char,usize)> = Vec::new();
+    let mut omit_letters: Vec<char> = Vec::new();
+    let mut omit_positions: Vec<usize> = Vec::new();
+    // for each play on the game board
+    for (guess,result) in board_state.iter(){
+        let guess_split: Vec<char> = guess.chars().collect();
+        for i in 0..guess_split.len(){ // guess_split and result should be the same length
+            // 0 indicates a guess letter is not in the string at all.
+            if result[i] == 0 {
+                omit_letters.push(guess_split[i]); // a value > 5 means omit from all positions
+                omit_positions.push(6); // a value > 5 means omit from all positions
+            } 
+            // 1 indicates a guess letter is in the string, but not in the right position
+            else if result[i] == 1 {
+                omit_letters.push(guess_split[i]); // a value > 5 means omit from all positions
+                omit_positions.push(i); // a value > 5 means omit from all positions
+            }
+        }
+    }
+
+//    println!("omit {:?} : {:?}",omit_letters,omit_positions);
+    return (omit_letters,omit_positions);
+}
+
+// include list. a letter and a position tuple, where the position is where to put the letter.
+// conceptually an inverse omit list, where all other letters are removed, and the freq is set really high.
+// let mut include: Vec<(&str,u8)> = Vec::new();
+// build include list
+//fn build_omit_list(board_state: &HashMap<String,Vec<u8>>) -> Vec<(&str,u8)> {
 
 // returns a vector where each position is a distance list for that position in the string
 fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(char,usize)>>{
@@ -103,14 +164,17 @@ fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(char,us
         // iterate over frequency row and build a distance list
         let mut distance_list: Vec<(char,usize)> = Vec::new();
         // all distance are with reference to the optimal
-        let (optimal_letter,optimal_freq) = sorted_row[0];
+        if sorted_row.len() <= 0{
+            panic!("sorted_row size is 0, which is not possible.")
+        }
+        let (_optimal_letter,optimal_freq) = sorted_row[0];
         for i in 0..sorted_row.len() {
-            let mut distance = 0;
-            let (letter,freq) = sorted_row[i];
+            let distance: usize;
+            let (letter,_freq) = sorted_row[i];
             if i == (sorted_row.len()-1){ // if this is the last
                 distance = 100000; // something really high that wont be rotated.
             } else { 
-                let (next_letter,next_freq) = sorted_row[i+1]; // grab the next letters frequence, store it under this letter.
+                let (_next_letter,next_freq) = sorted_row[i+1]; // grab the next letters frequence, store it under this letter.
                 distance = optimal_freq - next_freq;
             }
             distance_list.push((letter,distance));
@@ -125,9 +189,9 @@ fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(char,us
 //  use distance lists to find a word.
 fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>) -> String{
     // letter_movement keeps track of which letter positions are moving the most and ensures they keep moving
-    let letter_movement = [0,0,0,0,0];
+    let mut letter_movement = [0,0,0,0,0];
     // letter_grab keeps track of which positions to look at and grab from in the distance lists.
-    let letter_grab = [0,0,0,0,0];
+    let mut letter_grab = [0,0,0,0,0];
 
     // unpack distance lists
     let first_distance_list = &distance_lists[0];
@@ -138,7 +202,7 @@ fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>) 
 
     // loop
     // TODO: when should i actually quit?
-//    loop {
+    loop {
         // generate a word from the top of the distance list
         let guess_word_vec = vec![
                             first_distance_list[letter_grab[0]].0,
@@ -148,22 +212,22 @@ fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>) 
                             fifth_distance_list[letter_grab[4]].0
                             ];
         let guess_word: String = guess_word_vec.into_iter().collect();
-        println!("{}",guess_word);
+//        println!("{}",guess_word);
     
         // check if that word is in words. return it if it is.
         if words.contains(&guess_word.as_str()){
+//            println!("{:?} : {:?}", letter_movement, letter_grab);
             return guess_word.to_string();
         } else {
             // otherwise find the letter with the lowest distance and shift it. update letter_movement.
             // build a vector of the current distances
             let minvec = vec![
-                                first_distance_list[letter_grab[0]].1,
-                                second_distance_list[letter_grab[1]].1,
-                                third_distance_list[letter_grab[2]].1,
-                                fourth_distance_list[letter_grab[3]].1,
-                                fifth_distance_list[letter_grab[4]].1
-                                ];
- //          let minimum_distance = minvec.iter().min();
+                            first_distance_list[letter_grab[0]].1,
+                            second_distance_list[letter_grab[1]].1,
+                            third_distance_list[letter_grab[2]].1,
+                            fourth_distance_list[letter_grab[3]].1,
+                            fifth_distance_list[letter_grab[4]].1
+                            ];
             let minimum_distance = match minvec.iter().min() {
                 Some(a) => a,
                 None => panic!("No minimum distance found in suggest_word")
@@ -172,12 +236,60 @@ fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>) 
                 Some(a) => a,
                 None => panic!("No movement position found in suggest_word")
             };
-            println!("{:?} : {:?}", minvec, movement_position);
-        }
-//    }
 
-    return "nasty".to_string();
+            // now "move" that letter
+            letter_grab[movement_position] += 1;
+            letter_movement[movement_position] += 1;
+
+            // find letters that need to move back to the optimal, because its a higher movement letter
+            for i in 0..5{
+                if i != movement_position && letter_movement[i] >= letter_movement[movement_position]{
+                    letter_grab[i] = 0;
+                }
+            }
+        }
+    }
 }
+
+// get board results from user
+fn get_board_results() -> Vec<u8> {
+    // get input
+    let mut input: String = String::new();
+    io::stdin().read_line(&mut input).expect("Failed to read input");
+
+    // trim the newline
+    if input.ends_with('\n') {
+        input.pop();
+    }
+
+    // complain if the string isn't 5 characters long
+    if input.len() != 5{
+        panic!("Input is either too long or too short")
+    }
+
+    // parse the input into an array of integers
+    let split_input_raw: Vec<&str> = input.split("").collect();
+    let mut state_vec: Vec<u8> = Vec::new();
+    for entry in split_input_raw.iter(){
+        if entry.len() > 0{
+            // parse string like "0", "1", or "2" and handle errors
+            let state_entry = match entry.parse::<u8>() {
+                Ok(a) => a,
+                Err(_) => panic!("Could not parse input number. make sure you're doing it like '00120'")
+            };
+            state_vec.push(state_entry);
+        }
+    }
+    return state_vec
+}
+
+// receive word, return split version
+/*fn split_word(word: &String) -> Vec<char>{
+    // split each guess word in board_state for both omit and include list
+    let mut word_split: Vec<char> = word.chars().collect();
+    // remove stupid "" entries. i wish they just didn't happen.
+    return word_split;
+}*/
 
 // get the word list, suggest word to player, get board state update from player.
 fn main() {
@@ -194,15 +306,36 @@ fn main() {
 
     // board state tracks all guesses and the results of those guesses.
     // value is a hot encoding where 0 is a miss, 1 is an incorrect position, 2's are correct positions.
-    let mut board_state: HashMap<&str,Vec<u8>> = HashMap::new();
+    let mut board_state: HashMap<String,Vec<u8>> = HashMap::new();
 
-    // get letter frequencies
-    let letter_dist = get_letter_frequencies(&words);
+    // loop with user input
+    loop {
+        // get letter frequencies
+        let letter_dist = get_letter_frequencies(&words, &board_state);
 
-    // get distance lists for each row
-    let distance_lists = get_distance_list(&letter_dist);
+        // get distance lists for each row
+        let distance_lists = get_distance_list(&letter_dist);
 
-    // get a word
-    let guess_word = suggest_word(&words,&distance_lists);
-    println!("{}", guess_word);
+        // get a word
+        let guess_word = suggest_word(&words,&distance_lists);
+        println!("guess '{}'", guess_word);
+
+        // get board results
+        let state_vec = get_board_results();
+        
+        // quit if we're successful
+        if state_vec[0] == 2 &&
+           state_vec[1] == 2 &&
+           state_vec[2] == 2 &&
+           state_vec[3] == 2 &&
+           state_vec[4] == 2 {
+            println!("Congratulations.");
+            break()
+        }
+
+        // update the board state
+        board_state.insert(guess_word.clone(),state_vec);
+
+
+    }
 }
