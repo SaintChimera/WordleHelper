@@ -81,31 +81,47 @@ fn get_letter_frequencies(words: &HashSet<&str>, board_state: &HashMap<String,Ve
     // include list, used to indicate letters that are definitely in the right position.
     // TODO: as of right now, we ignore when a character is in the string but not in the correct position.
     //       right now it just gets added to the guess position in the omit list, so that it doesn't end up in that position again.
-//    let include = build_include_list(board_state);
+    let (include_letters,include_positions) = build_include_list(board_state);
 
     let mut letter_dist: HashMap<char,Vec<usize>> = HashMap::new();
     for word in words.into_iter(){ 
         let letters: Vec<char> = word.chars().collect();
         for i in 0..letters.len(){
             let letter = letters[i];
-            if omit_letters.contains(&letter) {
+            if include_letters.contains(&letter) {
+                let include_letter_loc = match include_letters.iter().position(|&x| x == letter){
+                    Some(a) => a,
+                    None => panic!("No movement position found in suggest_word")
+                };
+                // if our correct positions letter is in the position that we're analyzing.
+                // set that correct position letter as the only letter for that position, with a massive frequency.
+                if include_positions[include_letter_loc] == i{ 
+                    let letter_l = letter_dist.entry(letter).or_insert(vec![0,0,0,0,0]);
+                    letter_l[i] = 200000 // hard set the location super high
+                }
+            }
+            else if omit_letters.contains(&letter) {
                 let omit_letter_loc = match omit_letters.iter().position(|&x| x == letter){
                     Some(a) => a,
                     None => panic!("No movement position found in suggest_word")
                 };
-                if omit_positions[omit_letter_loc] > 5 { // skip insertion since this letter has been deemed not in the answer word
+                // skip insertion since this letter has been deemed not in the answer word
+                if omit_positions[omit_letter_loc] > 5 {
                     continue;
                 }
-                else if omit_positions[omit_letter_loc] < 5 && omit_positions[omit_letter_loc] == i { // skip insertion since this letter is not in this position in the answer word
+                // skip insertion since this letter is not in this position in the answer word
+                else if omit_positions[omit_letter_loc] < 5 && omit_positions[omit_letter_loc] == i {
                     continue;
                 }
-                else { // add the letter since the omit list doesn't omit it from this position
-                    let letter_l = letter_dist.entry(letter).or_insert(vec![0,0,0,0,0]); // either insert an empty vec or
+                // add the letter since the omit list doesn't omit it from this position
+                else {
+                    let letter_l = letter_dist.entry(letter).or_insert(vec![0,0,0,0,0]);
                     letter_l[i] = letter_l[i] + 1 // increment the position in the existing vec for that letter
                 }
             }
-            else { // add the letter since its not in the omit list
-                let letter_l = letter_dist.entry(letter).or_insert(vec![0,0,0,0,0]); // either insert an empty vec or
+            // add the letter since its not in the omit list
+            else {
+                let letter_l = letter_dist.entry(letter).or_insert(vec![0,0,0,0,0]);
                 letter_l[i] = letter_l[i] + 1 // increment the position in the existing vec for that letter
             }
         }
@@ -117,7 +133,6 @@ fn get_letter_frequencies(words: &HashSet<&str>, board_state: &HashMap<String,Ve
 // omit list. a letter and position tuple, where the position is where to omit the letter from.
 // a position >5 indicates an omit from every position
 fn build_omit_list(board_state: &HashMap<String,Vec<u8>>) -> (Vec<char>,Vec<usize>) {
-//    let mut omit: Vec<(char,usize)> = Vec::new();
     let mut omit_letters: Vec<char> = Vec::new();
     let mut omit_positions: Vec<usize> = Vec::new();
     // for each play on the game board
@@ -137,15 +152,30 @@ fn build_omit_list(board_state: &HashMap<String,Vec<u8>>) -> (Vec<char>,Vec<usiz
         }
     }
 
-//    println!("omit {:?} : {:?}",omit_letters,omit_positions);
     return (omit_letters,omit_positions);
 }
 
 // include list. a letter and a position tuple, where the position is where to put the letter.
 // conceptually an inverse omit list, where all other letters are removed, and the freq is set really high.
-// let mut include: Vec<(&str,u8)> = Vec::new();
 // build include list
-//fn build_omit_list(board_state: &HashMap<String,Vec<u8>>) -> Vec<(&str,u8)> {
+fn build_include_list(board_state: &HashMap<String,Vec<u8>>) -> (Vec<char>,Vec<usize>) {
+    let mut include_letters: Vec<char> = Vec::new();
+    let mut include_positions: Vec<usize> = Vec::new();
+    // for each play on the game board
+    for (guess,result) in board_state.iter(){
+        let guess_split: Vec<char> = guess.chars().collect();
+        for i in 0..guess_split.len(){ // guess_split and result should be the same length
+            // 0 indicates a guess letter is not in the string at all.
+            if result[i] == 2 {
+                include_letters.push(guess_split[i]); // a value > 5 means omit from all positions
+                include_positions.push(i); // a value > 5 means omit from all positions
+            } 
+        }
+    }
+    
+//    println!("include {:?} : {:?}",include_letters,include_positions);
+    return (include_letters,include_positions)
+}
 
 // returns a vector where each position is a distance list for that position in the string
 fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(char,usize)>>{
