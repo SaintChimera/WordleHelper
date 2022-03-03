@@ -141,7 +141,7 @@ fn build_omit_list(board_state: &HashMap<String,Vec<u8>>) -> (Vec<char>,Vec<usiz
         for i in 0..guess_split.len(){ // guess_split and result should be the same length
             // 0 indicates a guess letter is not in the string at all.
             if result[i] == 0 {
-                omit_letters.push(guess_split[i]); // a value > 5 means omit from all positions
+                omit_letters.push(guess_split[i]); // include the letter
                 omit_positions.push(6); // a value > 5 means omit from all positions
             } 
             // 1 indicates a guess letter is in the string, but not in the right position
@@ -157,7 +157,6 @@ fn build_omit_list(board_state: &HashMap<String,Vec<u8>>) -> (Vec<char>,Vec<usiz
 
 // include list. a letter and a position tuple, where the position is where to put the letter.
 // conceptually an inverse omit list, where all other letters are removed, and the freq is set really high.
-// build include list
 fn build_include_list(board_state: &HashMap<String,Vec<u8>>) -> (Vec<char>,Vec<usize>) {
     let mut include_letters: Vec<char> = Vec::new();
     let mut include_positions: Vec<usize> = Vec::new();
@@ -167,14 +166,32 @@ fn build_include_list(board_state: &HashMap<String,Vec<u8>>) -> (Vec<char>,Vec<u
         for i in 0..guess_split.len(){ // guess_split and result should be the same length
             // 0 indicates a guess letter is not in the string at all.
             if result[i] == 2 {
-                include_letters.push(guess_split[i]); // a value > 5 means omit from all positions
+                include_letters.push(guess_split[i]); // include the letter
                 include_positions.push(i); // a value > 5 means omit from all positions
             } 
         }
     }
     
-//    println!("include {:?} : {:?}",include_letters,include_positions);
     return (include_letters,include_positions)
+}
+
+// a list of letters which are in the file but not in the correct position.
+// the omit list already takes care of making sure these letters are not in the wrong position
+// so this just needs to be a list of letters that need to be in the string, position will work itself out.
+fn build_required_list(board_state: &HashMap<String,Vec<u8>>) -> Vec<char> {
+    let mut required_letters: Vec<char> = Vec::new();
+    // for each play on the game board
+    for (guess,result) in board_state.iter(){
+        let guess_split: Vec<char> = guess.chars().collect();
+        for i in 0..guess_split.len(){ // guess_split and result should be the same length
+            // 0 indicates a guess letter is not in the string at all.
+            if result[i] == 1 {
+                required_letters.push(guess_split[i]); // include the letter
+            } 
+        }
+    }
+    
+    return required_letters
 }
 
 // returns a vector where each position is a distance list for that position in the string
@@ -217,7 +234,7 @@ fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(char,us
 }
 
 //  use distance lists to find a word.
-fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>) -> String{
+fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>, board_state:&HashMap<String,Vec<u8>>) -> String{
     // letter_movement keeps track of which letter positions are moving the most and ensures they keep moving
     let mut letter_movement = [0,0,0,0,0];
     // letter_grab keeps track of which positions to look at and grab from in the distance lists.
@@ -231,7 +248,6 @@ fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>) 
     let fifth_distance_list = &distance_lists[4];
 
     // loop
-    // TODO: when should i actually quit?
     loop {
         // generate a word from the top of the distance list
         let guess_word_vec = vec![
@@ -241,12 +257,24 @@ fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>) 
                             fourth_distance_list[letter_grab[3]].0,
                             fifth_distance_list[letter_grab[4]].0
                             ];
+
+        // tracks whether the guess word is valid or not
+        // default to valid, and attempt to prove its invalid with the required_letters loop
+        let mut valid_guess: bool = true;
+
+        // get a list of letters that were in the word but not in the correct position, "1's"
+        // if the requred letter is not in the generated word, rotate a letter in the word at try again.
+        let required_letters = build_required_list(board_state);
+        for required_letter in required_letters{
+            if !guess_word_vec.contains(&required_letter){
+                valid_guess = false;
+            }
+        }
+
         let guess_word: String = guess_word_vec.into_iter().collect();
-//        println!("{}",guess_word);
     
         // check if that word is in words. return it if it is.
-        if words.contains(&guess_word.as_str()){
-//            println!("{:?} : {:?}", letter_movement, letter_grab);
+        if valid_guess && words.contains(&guess_word.as_str()){
             return guess_word.to_string();
         } else {
             // otherwise find the letter with the lowest distance and shift it. update letter_movement.
@@ -313,14 +341,6 @@ fn get_board_results() -> Vec<u8> {
     return state_vec
 }
 
-// receive word, return split version
-/*fn split_word(word: &String) -> Vec<char>{
-    // split each guess word in board_state for both omit and include list
-    let mut word_split: Vec<char> = word.chars().collect();
-    // remove stupid "" entries. i wish they just didn't happen.
-    return word_split;
-}*/
-
 // get the word list, suggest word to player, get board state update from player.
 fn main() {
     // get words in file
@@ -347,7 +367,7 @@ fn main() {
         let distance_lists = get_distance_list(&letter_dist);
 
         // get a word
-        let guess_word = suggest_word(&words,&distance_lists);
+        let guess_word = suggest_word(&words,&distance_lists, &board_state);
         println!("guess '{}'", guess_word);
 
         // get board results
