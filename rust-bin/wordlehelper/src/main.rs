@@ -234,7 +234,7 @@ fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(char,us
 }
 
 //  use distance lists to find a word.
-fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>, board_state:&HashMap<String,Vec<u8>>) -> String{
+fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>, board_state:&HashMap<String,Vec<u8>>, answers: &Vec<&str>) -> String{
     // letter_movement keeps track of which letter positions are moving the most and ensures they keep moving
     let mut letter_movement = [0,0,0,0,0];
     // letter_grab keeps track of which positions to look at and grab from in the distance lists.
@@ -270,8 +270,14 @@ fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>, 
                 valid_guess = false;
             }
         }
-
+        
+        // make guess string
         let guess_word: String = guess_word_vec.into_iter().collect();
+
+        // check if the word has been an answer in the past. dont guess it if it has been an answer.
+        if answers.contains(&guess_word.as_str()){
+            valid_guess = false;
+        }
     
         // check if that word is in words. return it if it is.
         if valid_guess && words.contains(&guess_word.as_str()){
@@ -343,8 +349,14 @@ fn get_board_results() -> Vec<u8> {
 
 // get the word list, suggest word to player, get board state update from player.
 fn main() {
-    // get words in file
     let args: Vec<String> = env::args().collect();
+    // sanity check that we have enough args
+    if args.len() < 3{
+        println!("Not enough args, run like $ ./wordlehelper ../../words/wordle_words.txt ../../words/ny_times_answers.txt 257");
+        return;
+    }
+    
+    // get words in file
     let word_file = &args[1];
     let words_s = fs::read_to_string(word_file);
     let words_s = match words_s {
@@ -353,6 +365,24 @@ fn main() {
     };
     // split to hashset of str's
     let words: HashSet<&str> = words_s.split("\n").collect();
+
+    // get answer list so that we can exclude previous answers from our guesses.
+    let answer_file = &args[2];
+    let answer_s = fs::read_to_string(answer_file);
+    let answer_s = match answer_s {
+        Ok(a) => a,
+        Err(error) => panic!("Could not open answer file: {:?}", error)
+    };
+
+    // get the day that we're playing to trim down the answer list.
+    let day_a = &args[3];
+    let day = match day_a.parse::<usize>() {
+        Ok(a) => a,
+        Err(error) => panic!("Could not parse day: {:?}", error)
+    };
+    // reduce to a vec of old answers according to the day
+    let mut answers: Vec<&str> = answer_s.split("\n").collect();
+    answers.resize(day,&"");
 
     // board state tracks all guesses and the results of those guesses.
     // value is a hot encoding where 0 is a miss, 1 is an incorrect position, 2's are correct positions.
@@ -367,7 +397,7 @@ fn main() {
         let distance_lists = get_distance_list(&letter_dist);
 
         // get a word
-        let guess_word = suggest_word(&words,&distance_lists, &board_state);
+        let guess_word = suggest_word(&words,&distance_lists, &board_state, &answers);
         println!("guess '{}'", guess_word);
 
         // get board results
