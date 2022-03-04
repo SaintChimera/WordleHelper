@@ -72,13 +72,102 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 mod player;
+mod game;
+
+// receive words, answers, and day. pick answer word. begin loop of calling player, validating guess, and returning guess results
+fn automated(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
+    // grab a word to be the answer
+    let answer = answers[day.clone()];
+
+    // trim the answers to only have old answers. not current or future ones
+    let mut answers = answers.to_vec();
+    answers.resize(day.clone(),&"");
+
+    // board state tracks all guesses and the results of those guesses.
+    // value is a hot encoding where 0 is a miss, 1 is an incorrect position, 2's are correct positions.
+    let mut board_state: HashMap<String,Vec<u8>> = HashMap::new();
+
+    // loop counter keeps track of how many guesses it took
+    let mut loop_counter = 0;
+    // loop and check answer
+    loop {
+        // update loop counter to match guess count
+        loop_counter += 1;
+
+        // get letter frequencies
+        let letter_dist = player::get_letter_frequencies(&words, &board_state);
+
+        // get distance lists for each row
+        let distance_lists = player::get_distance_list(&letter_dist);
+
+        // get a word
+        let guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers);
+
+        // get board results
+        let state_vec = game::determine_board_results(&answer.to_string(), &guess_word);
+
+        // quit if we're successful
+        if state_vec[0] == 2 &&
+           state_vec[1] == 2 &&
+           state_vec[2] == 2 &&
+           state_vec[3] == 2 &&
+           state_vec[4] == 2 {
+            println!("guessed '{}' in {} guesses.",guess_word,loop_counter);
+            break()
+        }
+
+        // update the board state
+        board_state.insert(guess_word.clone(),state_vec);
+    }
+}
+
+fn interactive(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
+    // trim the answers to only have old answers. not current or future ones
+    let mut answers = answers.to_vec();
+    answers.resize(day.clone(),&"");
+
+    // board state tracks all guesses and the results of those guesses.
+    // value is a hot encoding where 0 is a miss, 1 is an incorrect position, 2's are correct positions.
+    let mut board_state: HashMap<String,Vec<u8>> = HashMap::new();
+
+    // loop with user input
+    loop {
+        // get letter frequencies
+        let letter_dist = player::get_letter_frequencies(&words, &board_state);
+
+        // get distance lists for each row
+        let distance_lists = player::get_distance_list(&letter_dist);
+
+        // suggest a word
+        let guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers);
+        println!("guess '{}'", guess_word);
+
+        // get board results
+        let state_vec = player::get_board_results();
+
+        // quit if we're successful
+        if state_vec[0] == 2 &&
+           state_vec[1] == 2 &&
+           state_vec[2] == 2 &&
+           state_vec[3] == 2 &&
+           state_vec[4] == 2 {
+            println!("Congratulations.");
+            break()
+        }
+
+        // update the board state
+        board_state.insert(guess_word.clone(),state_vec);
+
+
+    }
+}
 
 // get the word list, suggest word to player, get board state update from player.
 fn main() {
     let args: Vec<String> = env::args().collect();
     // sanity check that we have enough args
-    if args.len() < 3{
-        println!("Not enough args, run like $ ./wordlehelper ../../words/wordle_words.txt ../../words/ny_times_answers.txt 257");
+    if args.len() < 4{
+        println!("Not enough args, run like $ ./wordlehelper ../../words/wordle_words.txt ../../words/ny_times_answers.txt 257 i");
         return;
     }
     
@@ -107,9 +196,25 @@ fn main() {
         Err(error) => panic!("Could not parse day: {:?}", error)
     };
     // reduce to a vec of old answers according to the day
-    let mut answers: Vec<&str> = answer_s.split("\n").collect();
-    println!("answer: {:?}",answers[day]);
-    answers.resize(day,&"");
+    let answers: Vec<&str> = answer_s.split("\n").collect();
+//    println!("answer: {:?}",answers[day]);
 
-    player::interactive(&words, &answers, &day);
+    let mode = &args[4];
+
+    if mode == &"a"{
+        if day == 10000{
+            for i in 0..answers.len(){
+                automated(&words, &answers, &i);
+            }
+        }
+        else {
+            automated(&words, &answers, &day);
+        }
+    }
+    else if mode == &"i" {
+        interactive(&words, &answers, &day);
+    }
+    else {
+        println!("Invalid game mode. Please use 'a' or 'i'.")
+    }
 }
