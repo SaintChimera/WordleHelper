@@ -14,7 +14,6 @@ pub fn get_letter_frequencies(words: &HashSet<&str>, board_state: &HashMap<Strin
     // omit list, used to indicate letters that are definitely not in the set and in the wrong position
     let omit_list = build_omit_list(board_state);
     // include list, used to indicate letters that are definitely in the right position.
-//    let (include_letters,include_positions) = build_include_list(board_state);
     let include_list = build_include_list(board_state);
 
     let mut letter_dist: HashMap<char,Vec<usize>> = HashMap::new();
@@ -87,8 +86,6 @@ fn build_omit_list(board_state: &HashMap<String,Vec<u8>>) -> HashMap<char,Vec<us
 // conceptually an inverse omit list, where all other letters are removed, and the freq is set really high.
 //fn build_include_list(board_state: &HashMap<String,Vec<u8>>) -> (Vec<char>,Vec<usize>) {
 fn build_include_list(board_state: &HashMap<String,Vec<u8>>) -> HashMap<char,Vec<usize>> {
-//    let mut include_letters: Vec<char> = Vec::new();
-//    let mut include_positions: Vec<usize> = Vec::new();
     let mut include_list: HashMap<char,Vec<usize>> = HashMap::new();
     // for each play on the game board
     for (guess,result) in board_state.iter(){
@@ -103,12 +100,13 @@ fn build_include_list(board_state: &HashMap<String,Vec<u8>>) -> HashMap<char,Vec
     }
     
     return include_list;
-//    return (include_letters,include_positions)
 }
 
 // a list of letters which are in the file but not in the correct position.
 // the omit list already takes care of making sure these letters are not in the wrong position
-// so this just needs to be a list of letters that need to be in the string, position will work itself out.
+// the include list takes care of letters in the correct position.
+// so this just needs to be a list of letters that were in the string but in the wrong spot.
+// position will work itself out from the omit list and include list
 fn build_required_list(board_state: &HashMap<String,Vec<u8>>) -> Vec<char> {
     let mut required_letters: Vec<char> = Vec::new();
     // for each play on the game board
@@ -148,8 +146,9 @@ pub fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(cha
         let (_optimal_letter,optimal_freq) = sorted_row[0];
         for i in 0..sorted_row.len() {
             let distance: usize;
-            let (letter,_freq) = sorted_row[i];
-            if i == (sorted_row.len()-1){ // if this is the last
+            let (letter,freq) = sorted_row[i];
+            // if this is the last letter or if the frequency is 0 indicating it should be skipped
+            if i == (sorted_row.len()-1) || freq == 0 {
                 distance = 100000; // something really high that wont be rotated.
             } else { 
                 let (_next_letter,next_freq) = sorted_row[i+1]; // grab the next letters frequence, store it under this letter.
@@ -157,6 +156,7 @@ pub fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(cha
             }
             distance_list.push((letter,distance));
         }
+
         distance_lists.push(distance_list);
     }
 
@@ -187,10 +187,9 @@ pub fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)
            letter_grab[2] >= third_distance_list.len() || 
            letter_grab[3] >= fourth_distance_list.len() || 
            letter_grab[4] >= fifth_distance_list.len(){
-            println!("No more words left to guess. Try a bigger word list.");
-            process::exit(1);
+            return "".to_string();
         }
-    
+
         // generate a word from the top of the distance list
         let guess_word_vec = vec![
                             first_distance_list[letter_grab[0]].0,

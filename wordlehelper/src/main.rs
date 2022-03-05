@@ -89,6 +89,8 @@ fn automated(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
 
     // loop counter keeps track of how many guesses it took
     let mut loop_counter = 0;
+    // guesses keeps track of all guesses, to be printed to the user
+    let mut guesses: Vec<String> = Vec::new();
     // loop and check answer
     loop {
         // update loop counter to match guess count
@@ -102,6 +104,11 @@ fn automated(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
 
         // get a word
         let guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers);
+        guesses.push(guess_word.clone());
+        if guess_word == "".to_string(){
+            println!("failed to guess word {:?}",guesses);
+            break
+        }
 
         // get board results
         let state_vec = game::determine_board_results(&answer.to_string(), &guess_word);
@@ -112,8 +119,8 @@ fn automated(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
            state_vec[2] == 2 &&
            state_vec[3] == 2 &&
            state_vec[4] == 2 {
-            println!("guessed '{}' in {} guesses.",guess_word,loop_counter);
-            break()
+            println!("guessed '{}' in {} guesses. {:?}",guess_word,loop_counter,guesses);
+            break
         }
 
         // update the board state
@@ -140,6 +147,10 @@ fn interactive(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
 
         // suggest a word
         let guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers);
+        if guess_word == "".to_string(){
+            println!("No more words left to guess. The answer word is not in the list.");
+            break
+        }
         println!("guess '{}'", guess_word);
 
         // get board results
@@ -197,7 +208,6 @@ fn main() {
     };
     // reduce to a vec of old answers according to the day
     let answers: Vec<&str> = answer_s.split("\n").collect();
-//    println!("answer: {:?}",answers[day]);
 
     let mode = &args[4];
 
@@ -212,6 +222,7 @@ fn main() {
         }
     }
     else if mode == &"i" {
+        println!("answer is '{}'",answers[day]);
         interactive(&words, &answers, &day);
     }
     else {
