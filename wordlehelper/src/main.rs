@@ -103,7 +103,8 @@ fn automated(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
         let distance_lists = player::get_distance_list(&letter_dist);
 
         // get a word
-        let guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers);
+        let guess_word = player::get_word(&words,&distance_lists, &board_state, &answers);
+        let _guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers);
         guesses.push(guess_word.clone());
         if guess_word == "".to_string(){
             println!("failed to guess word {:?}",guesses);

@@ -3,7 +3,7 @@
 */
 
 use std::io;
-use std::process;
+//use std::process;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -32,6 +32,8 @@ pub fn get_letter_frequencies(words: &HashSet<&str>, board_state: &HashMap<Strin
                 };
                 // if the position we're analyzing is in the omit vec for this letter
                 if omit_list_locs.contains(&i) || omit_list_locs.contains(&6) {
+                    let letter_l = letter_dist.entry(letter).or_insert(vec![0,0,0,0,0]);
+                    letter_l[i] = 0; // hard set the location to no occurences
                     continue
                 }
             }
@@ -44,7 +46,7 @@ pub fn get_letter_frequencies(words: &HashSet<&str>, board_state: &HashMap<Strin
                 // if the include position for that letter is the position we're analyzing
                 if include_list_locs.contains(&i){
                     let letter_l = letter_dist.entry(letter).or_insert(vec![0,0,0,0,0]);
-                    letter_l[i] = 200000; // hard set the location super high
+                    letter_l[i] = 200000; // hard set the location super high so that the letter doesn't get rotated
                     continue
                 }
             }
@@ -84,7 +86,6 @@ fn build_omit_list(board_state: &HashMap<String,Vec<u8>>) -> HashMap<char,Vec<us
 
 // include list. a letter and a position tuple, where the position is where to put the letter.
 // conceptually an inverse omit list, where all other letters are removed, and the freq is set really high.
-//fn build_include_list(board_state: &HashMap<String,Vec<u8>>) -> (Vec<char>,Vec<usize>) {
 fn build_include_list(board_state: &HashMap<String,Vec<u8>>) -> HashMap<char,Vec<usize>> {
     let mut include_list: HashMap<char,Vec<usize>> = HashMap::new();
     // for each play on the game board
@@ -128,14 +129,19 @@ pub fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(cha
     // iterate over hashmap pulling out the vec's values into separate hashmaps. push those to a vec to be our distance lists.
     let mut distance_lists: Vec<Vec<(char,usize)>> = Vec::new();
     for i in 0..5{
+        // unpack a hashmap of just distributions for 1 specific position
         let mut ret_row: HashMap<char,usize> = HashMap::new();
         for (letter,list) in letter_dist.iter(){
             ret_row.insert(*letter,list[i]);
         }
 
+
+        // sort that row by smallest to largest
         let mut sorted_row: Vec<(char,usize)> = ret_row.into_iter().collect();
         sorted_row.sort_by_key(|a| a.1);
         sorted_row.reverse();
+        // artificial entry of an ending letter to not rotate past
+        sorted_row.push(('.',0));
 
         // iterate over frequency row and build a distance list
         let mut distance_list: Vec<(char,usize)> = Vec::new();
@@ -149,16 +155,21 @@ pub fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(cha
             let (letter,freq) = sorted_row[i];
             // if this is the last letter or if the frequency is 0 indicating it should be skipped
             if i == (sorted_row.len()-1) || freq == 0 {
-                distance = 100000; // something really high that wont be rotated.
+                distance = 1000000; // something really high that wont be rotated.
             } else { 
                 let (_next_letter,next_freq) = sorted_row[i+1]; // grab the next letters frequence, store it under this letter.
-                distance = optimal_freq - next_freq;
+                distance = optimal_freq - freq;
             }
             distance_list.push((letter,distance));
         }
 
+/*        for entry in distance_list.iter(){
+            println!("{:?}",entry);
+        }
+        println!("");*/
         distance_lists.push(distance_list);
     }
+
 
     // return looks like distance_lists<distance_list<letter,distance>>
     return distance_lists;
@@ -182,11 +193,11 @@ pub fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)
     loop {
         // check if we overflow an entry in the distance list
         // this means we couldn't find a valid word and we need to quit.
-        if letter_grab[0] >= first_distance_list.len() ||
-           letter_grab[1] >= second_distance_list.len() || 
-           letter_grab[2] >= third_distance_list.len() || 
-           letter_grab[3] >= fourth_distance_list.len() || 
-           letter_grab[4] >= fifth_distance_list.len(){
+        if letter_grab[0]+1 >= first_distance_list.len() ||
+           letter_grab[1]+1 >= second_distance_list.len() || 
+           letter_grab[2]+1 >= third_distance_list.len() || 
+           letter_grab[3]+1 >= fourth_distance_list.len() || 
+           letter_grab[4]+1 >= fifth_distance_list.len(){
             return "".to_string();
         }
 
@@ -227,11 +238,11 @@ pub fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)
             // otherwise find the letter with the lowest distance and shift it. update letter_movement.
             // build a vector of the current distances
             let minvec = vec![
-                            first_distance_list[letter_grab[0]].1,
-                            second_distance_list[letter_grab[1]].1,
-                            third_distance_list[letter_grab[2]].1,
-                            fourth_distance_list[letter_grab[3]].1,
-                            fifth_distance_list[letter_grab[4]].1
+                            first_distance_list[letter_grab[0]+1].1,
+                            second_distance_list[letter_grab[1]+1].1,
+                            third_distance_list[letter_grab[2]+1].1,
+                            fourth_distance_list[letter_grab[3]+1].1,
+                            fifth_distance_list[letter_grab[4]+1].1
                             ];
             let minimum_distance = match minvec.iter().min() {
                 Some(a) => a,
@@ -252,6 +263,69 @@ pub fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)
                     letter_grab[i] = 0;
                 }
             }
+        }
+    }
+}
+
+// take each word in words, assign a score to it according to the distance lists, check if its in answers, return the lowest distanced word.
+pub fn get_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>, board_state:&HashMap<String,Vec<u8>>, answers: &Vec<&str>) -> String{
+
+    // hashmap to store each word and its distance value
+    let mut word_distances: HashMap<&str,usize> = HashMap::new();
+
+    // for every word, split it into its characters, add the distance of each letter to the accumulator, store the word and its score.
+    for word in words.iter(){
+        let word_letters: Vec<char> = word.chars().collect();
+        
+        // accumulator will be the total distance for a word.
+        let mut accumulator = 0;
+        for i in 0..word_letters.len(){
+            let letter = word_letters[i];
+            // unpack the positions distance list;
+            let distance_list = &distance_lists[i];
+            // get the distance for the current letter
+            let mut distance = 0;
+            for distance_pair in distance_list.iter(){
+                if distance_pair.0 == letter{
+                    distance = distance_pair.1;
+                }
+            }
+            // add the distance to the accumulator
+            accumulator += distance;
+        }
+
+        // assign the word and distances to the hashmap
+        word_distances.insert(word,accumulator);
+    }
+    word_distances.remove("");
+
+
+    let required_letters = build_required_list(board_state);
+    loop {
+        let guess = match word_distances.iter().min_by_key(|entry| entry.1){
+            Some(a) => a,
+            None => panic!("No guess was found in get_word")
+        };
+
+        let guess_word = guess.0.to_string();
+        let guess_word_vec: Vec<char> = guess_word.chars().collect();
+
+        let mut valid_guess: bool = true;
+        // make sure our word has all the required letters
+        for required_letter in &required_letters{
+            if !guess_word_vec.contains(required_letter){
+                valid_guess = false;
+            }
+        }
+        
+        if valid_guess {
+//            println!("{:?}",word_distances);
+//            println!("guess {:?}",guess);
+//            println!("answer 'ahead' {:?}",word_distances.get(&"ahead").unwrap());
+            return guess_word;
+        }
+        else { 
+            word_distances.remove(guess_word.as_str());
         }
     }
 }
