@@ -163,10 +163,6 @@ pub fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(cha
             distance_list.push((letter,distance));
         }
 
-/*        for entry in distance_list.iter(){
-            println!("{:?}",entry);
-        }
-        println!("");*/
         distance_lists.push(distance_list);
     }
 
@@ -175,100 +171,8 @@ pub fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(cha
     return distance_lists;
 }
 
-//  use distance lists to find a word.
+// take each word in words, assign a distance score to it according to the distance lists, check if its in answers, return the lowest distance score word. this is the best guess
 pub fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>, board_state:&HashMap<String,Vec<u8>>, answers: &Vec<&str>) -> String{
-    // letter_movement keeps track of which letter positions are moving the most and ensures they keep moving
-    let mut letter_movement = [0,0,0,0,0];
-    // letter_grab keeps track of which positions to look at and grab from in the distance lists.
-    let mut letter_grab = [0,0,0,0,0];
-
-    // unpack distance lists
-    let first_distance_list = &distance_lists[0];
-    let second_distance_list = &distance_lists[1];
-    let third_distance_list = &distance_lists[2];
-    let fourth_distance_list = &distance_lists[3];
-    let fifth_distance_list = &distance_lists[4];
-
-    // loop
-    loop {
-        // check if we overflow an entry in the distance list
-        // this means we couldn't find a valid word and we need to quit.
-        if letter_grab[0]+1 >= first_distance_list.len() ||
-           letter_grab[1]+1 >= second_distance_list.len() || 
-           letter_grab[2]+1 >= third_distance_list.len() || 
-           letter_grab[3]+1 >= fourth_distance_list.len() || 
-           letter_grab[4]+1 >= fifth_distance_list.len(){
-            return "".to_string();
-        }
-
-        // generate a word from the top of the distance list
-        let guess_word_vec = vec![
-                            first_distance_list[letter_grab[0]].0,
-                            second_distance_list[letter_grab[1]].0,
-                            third_distance_list[letter_grab[2]].0,
-                            fourth_distance_list[letter_grab[3]].0,
-                            fifth_distance_list[letter_grab[4]].0
-                            ];
-
-        // tracks whether the guess word is valid or not
-        // default to valid, and attempt to prove its invalid with the required_letters loop
-        let mut valid_guess: bool = true;
-
-        // get a list of letters that were in the word but not in the correct position, "1's"
-        // if the requred letter is not in the generated word, rotate a letter in the word at try again.
-        let required_letters = build_required_list(board_state);
-        for required_letter in required_letters{
-            if !guess_word_vec.contains(&required_letter){
-                valid_guess = false;
-            }
-        }
-        
-        // make guess string
-        let guess_word: String = guess_word_vec.into_iter().collect();
-
-        // check if the word has been an answer in the past. dont guess it if it has been an answer.
-        if answers.contains(&guess_word.as_str()){
-            valid_guess = false;
-        }
-    
-        // check if that word is in words. return it if it is.
-        if valid_guess && words.contains(&guess_word.as_str()){
-            return guess_word.to_string();
-        } else {
-            // otherwise find the letter with the lowest distance and shift it. update letter_movement.
-            // build a vector of the current distances
-            let minvec = vec![
-                            first_distance_list[letter_grab[0]+1].1,
-                            second_distance_list[letter_grab[1]+1].1,
-                            third_distance_list[letter_grab[2]+1].1,
-                            fourth_distance_list[letter_grab[3]+1].1,
-                            fifth_distance_list[letter_grab[4]+1].1
-                            ];
-            let minimum_distance = match minvec.iter().min() {
-                Some(a) => a,
-                None => panic!("No minimum distance found in suggest_word")
-            };
-            let movement_position = match minvec.iter().position(|&x| x == *minimum_distance){
-                Some(a) => a,
-                None => panic!("No movement position found in suggest_word")
-            };
-
-            // now "move" that letter
-            letter_grab[movement_position] += 1;
-            letter_movement[movement_position] += 1;
-
-            // find letters that need to move back to the optimal, because its a higher movement letter
-            for i in 0..5{
-                if i != movement_position && letter_movement[i] >= letter_movement[movement_position]{
-                    letter_grab[i] = 0;
-                }
-            }
-        }
-    }
-}
-
-// take each word in words, assign a score to it according to the distance lists, check if its in answers, return the lowest distanced word.
-pub fn get_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>, board_state:&HashMap<String,Vec<u8>>, answers: &Vec<&str>) -> String{
 
     // hashmap to store each word and its distance value
     let mut word_distances: HashMap<&str,usize> = HashMap::new();
@@ -319,9 +223,6 @@ pub fn get_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>, 
         }
         
         if valid_guess {
-//            println!("{:?}",word_distances);
-//            println!("guess {:?}",guess);
-//            println!("answer 'ahead' {:?}",word_distances.get(&"ahead").unwrap());
             return guess_word;
         }
         else { 
