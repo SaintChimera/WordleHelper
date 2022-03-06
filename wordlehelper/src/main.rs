@@ -58,7 +58,8 @@ fn automated(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
            state_vec[2] == 2 &&
            state_vec[3] == 2 &&
            state_vec[4] == 2 {
-            println!("day {} : guessed '{}' in {} guesses. {:?}",day,guess_word,loop_counter,guesses);
+//            println!("day {} : guessed '{}' in {} guesses. {:?}",day,guess_word,loop_counter,guesses);
+            println!("{},{}",day,loop_counter);
             break
         }
 
@@ -152,6 +153,7 @@ fn main() {
 
     if mode == &"a"{
         if day == 10000{
+//            println!("day,guesses");
             for i in 0..answers.len(){
                 automated(&words, &answers, &i);
             }

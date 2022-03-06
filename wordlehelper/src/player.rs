@@ -1,9 +1,8 @@
 /*
-* guesses words for wordle. depends on main. methods are explained in main
+* guesses words for wordle. depends on main. methods are explained in blog post
 */
 
 use std::io;
-//use std::process;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -157,7 +156,7 @@ pub fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(cha
             if i == (sorted_row.len()-1) || freq == 0 {
                 distance = 1000000; // something really high that wont be rotated.
             } else { 
-                let (_next_letter,next_freq) = sorted_row[i+1]; // grab the next letters frequence, store it under this letter.
+                let (_next_letter,_next_freq) = sorted_row[i+1]; // grab the next letters frequence, store it under this letter.
                 distance = optimal_freq - freq;
             }
             distance_list.push((letter,distance));
@@ -215,10 +214,23 @@ pub fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)
         let guess_word_vec: Vec<char> = guess_word.chars().collect();
 
         let mut valid_guess: bool = true;
+
         // make sure our word has all the required letters
         for required_letter in &required_letters{
             if !guess_word_vec.contains(required_letter){
                 valid_guess = false;
+            }
+        }
+
+        // make sure our first word does not have duplicate letters        
+        if board_state.len() == 0 {
+            for letter in guess_word_vec.iter(){
+                let mut guess_word_vec_clone = guess_word_vec.clone();
+                let index = guess_word_vec_clone.iter().position(|x| x == letter).unwrap();
+                guess_word_vec_clone.remove(index);
+                if guess_word_vec_clone.contains(&letter){
+                    valid_guess = false;
+                }
             }
         }
         

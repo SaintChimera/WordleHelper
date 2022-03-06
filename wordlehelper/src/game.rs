@@ -24,7 +24,7 @@ pub fn determine_board_results(answer: &String, guess_word: &String) -> Vec<u8> 
         }
     }
 
-    println!("{:?} : {:?}", guess_word_chars, state_vec);
+//    println!("{:?} : {:?}", guess_word_chars, state_vec);
     return state_vec;
 }
 
