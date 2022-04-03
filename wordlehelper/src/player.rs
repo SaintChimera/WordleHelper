@@ -6,6 +6,34 @@ use std::io;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+// get a collection of letters that the guess word should use.
+pub fn suggest_letters(words: &HashSet<&str>, loop_counter: &usize) -> Vec<char>{
+    let mut letters_freq: HashMap<char,usize> = HashMap::new();
+    
+    // get the letter frequencies
+    for word in words.into_iter(){
+        let letters: Vec<char> = word.chars().collect();
+        for i in 0..letters.len(){
+            let letter = letters[i];
+            let letter_freq_entry = letters_freq.entry(letter).or_insert(0);
+            *letter_freq_entry += 1;
+        }
+    }
+
+    // sort that row by smallest to largest
+    let mut sorted_row: Vec<(char,usize)> = letters_freq.into_iter().collect();
+    sorted_row.sort_by_key(|a| a.1);
+    sorted_row.reverse();
+
+    // take 5 letters according to the loop count.
+    let suggest_letters = vec![sorted_row[0+(loop_counter*5)].0,
+                           sorted_row[1+(loop_counter*5)].0,
+                           sorted_row[2+(loop_counter*5)].0,
+                           sorted_row[3+(loop_counter*5)].0,
+                           sorted_row[4+(loop_counter*5)].0];
+
+    return suggest_letters;
+}
 
 // get the frequencies of each letter in their positions
 // use the omit list and include list to force letters in or out of their positions
@@ -171,7 +199,7 @@ pub fn get_distance_list(letter_dist: &HashMap<char,Vec<usize>>) -> Vec<Vec<(cha
 }
 
 // take each word in words, assign a distance score to it according to the distance lists, check if its in answers, return the lowest distance score word. this is the best guess
-pub fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>, board_state:&HashMap<String,Vec<u8>>, answers: &Vec<&str>) -> String{
+pub fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)>>, board_state:&HashMap<String,Vec<u8>>, answers: &Vec<&str>, letters: Vec<char>) -> String{
 
     // hashmap to store each word and its distance value
     let mut word_distances: HashMap<&str,usize> = HashMap::new();
@@ -203,7 +231,15 @@ pub fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)
     word_distances.remove("");
 
 
-    let required_letters = build_required_list(board_state);
+    // if we are guessing based on simple letter frequencies, there will be a letters vec.
+    // if we are guessing based on letter frequencies and positions, then we need to build a list of letters to include
+    let mut required_letters: Vec<char> = Vec::new();
+    if letters.len() > 0{
+        required_letters = letters;
+    }
+    else {
+        required_letters = build_required_list(board_state);
+    }
     loop {
         let guess = match word_distances.iter().min_by_key(|entry| entry.1){
             Some(a) => a,

@@ -32,17 +32,24 @@ fn automated(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
     let mut guesses: Vec<String> = Vec::new();
     // loop and check answer
     loop {
-        // update loop counter to match guess count
-        loop_counter += 1;
 
-        // get letter frequencies
+        // get letter frequencies considering position
         let letter_dist = player::get_letter_frequencies(&words, &board_state);
+
+        // get letter frequencies without considering positions
+        let letters = player::suggest_letters(&words, &loop_counter);
 
         // get distance lists for each row
         let distance_lists = player::get_distance_list(&letter_dist);
 
-        // get a word
-        let guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers);
+        let mut guess_word: String = "".to_string();
+        // get a word with either required letters or not depending on the loop_counter
+        if loop_counter >= 2{
+            guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers, vec![]);
+        }
+        else{
+            guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers, letters);
+        }
         guesses.push(guess_word.clone());
         if guess_word == "".to_string(){
             println!("failed to guess word {:?}",guesses);
@@ -52,14 +59,18 @@ fn automated(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
         // get board results
         let state_vec = game::determine_board_results(&answer.to_string(), &guess_word);
 
+        // update loop counter to match guess count
+        loop_counter += 1;
+
         // quit if we're successful
         if state_vec[0] == 2 &&
            state_vec[1] == 2 &&
            state_vec[2] == 2 &&
            state_vec[3] == 2 &&
            state_vec[4] == 2 {
-//            println!("day {} : guessed '{}' in {} guesses. {:?}",day,guess_word,loop_counter,guesses);
-            println!("{},{}",day,loop_counter);
+            println!("day {} : guessed '{}' in {} guesses. {:?}",day,guess_word,loop_counter,guesses);
+            // statistics print statement.
+//            println!("{},{}",day,loop_counter);
             break
         }
 
@@ -77,16 +88,28 @@ fn interactive(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
     // value is a hot encoding where 0 is a miss, 1 is an incorrect position, 2's are correct positions.
     let mut board_state: HashMap<String,Vec<u8>> = HashMap::new();
 
+    // loop counter keeps track of how many guesses it took
+    let mut loop_counter = 0;
     // loop with user input
     loop {
         // get letter frequencies
         let letter_dist = player::get_letter_frequencies(&words, &board_state);
 
+        // get letter frequencies without considering positions
+        let letters = player::suggest_letters(&words, &loop_counter);
+        println!("{:?}",letters);
+
         // get distance lists for each row
         let distance_lists = player::get_distance_list(&letter_dist);
 
         // suggest a word
-        let guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers);
+        let mut guess_word: String = "".to_string();
+        if loop_counter >= 2{
+            guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers, vec![]);
+        }
+        else{
+            guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers, letters);
+        }
         if guess_word == "".to_string(){
             println!("No more words left to guess. The answer word is not in the list.");
             break
@@ -95,6 +118,9 @@ fn interactive(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
 
         // get board results
         let state_vec = player::get_board_results();
+
+        // update loop counter to match guess count
+        loop_counter += 1;
 
         // quit if we're successful
         if state_vec[0] == 2 &&
