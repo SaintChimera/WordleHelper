@@ -37,19 +37,19 @@ fn automated(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
         let letter_dist = player::get_letter_frequencies(&words, &board_state);
 
         // get letter frequencies without considering positions
-        let letters = player::suggest_letters(&words, &loop_counter);
+        let mut letters: Vec<char> = Vec::new();
+        if loop_counter >= 2{
+            letters = vec![];
+        }
+        else{
+            letters = player::suggest_letters(&words, &loop_counter);
+        }
 
         // get distance lists for each row
         let distance_lists = player::get_distance_list(&letter_dist);
 
-        let mut guess_word: String = "".to_string();
         // get a word with either required letters or not depending on the loop_counter
-        if loop_counter >= 2{
-            guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers, vec![]);
-        }
-        else{
-            guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers, letters);
-        }
+        let guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers, letters);
         guesses.push(guess_word.clone());
         if guess_word == "".to_string(){
             println!("failed to guess word {:?}",guesses);
@@ -96,20 +96,19 @@ fn interactive(words: &HashSet<&str>, answers: &Vec<&str>, day: &usize) {
         let letter_dist = player::get_letter_frequencies(&words, &board_state);
 
         // get letter frequencies without considering positions
-        let letters = player::suggest_letters(&words, &loop_counter);
-        println!("{:?}",letters);
+        let mut letters: Vec<char> = Vec::new();
+        if loop_counter >= 2{
+            letters = vec![];
+        }
+        else{
+            letters = player::suggest_letters(&words, &loop_counter);
+        }
 
         // get distance lists for each row
         let distance_lists = player::get_distance_list(&letter_dist);
 
         // suggest a word
-        let mut guess_word: String = "".to_string();
-        if loop_counter >= 2{
-            guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers, vec![]);
-        }
-        else{
-            guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers, letters);
-        }
+        let guess_word = player::suggest_word(&words,&distance_lists, &board_state, &answers, letters);
         if guess_word == "".to_string(){
             println!("No more words left to guess. The answer word is not in the list.");
             break

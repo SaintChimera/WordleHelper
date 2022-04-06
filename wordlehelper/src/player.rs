@@ -230,12 +230,12 @@ pub fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)
     }
     word_distances.remove("");
 
-
     // if we are guessing based on simple letter frequencies, there will be a letters vec.
     // if we are guessing based on letter frequencies and positions, then we need to build a list of letters to include
     let mut required_letters: Vec<char> = Vec::new();
     if letters.len() > 0{
         required_letters = letters;
+//        required_letters = build_required_list(board_state);
     }
     else {
         required_letters = build_required_list(board_state);
@@ -259,7 +259,7 @@ pub fn suggest_word(words: &HashSet<&str>, distance_lists: &Vec<Vec<(char,usize)
         }
 
         // make sure our first word does not have duplicate letters        
-        if board_state.len() == 0 {
+        if board_state.len() <= 0 {
             for letter in guess_word_vec.iter(){
                 let mut guess_word_vec_clone = guess_word_vec.clone();
                 let index = guess_word_vec_clone.iter().position(|x| x == letter).unwrap();
